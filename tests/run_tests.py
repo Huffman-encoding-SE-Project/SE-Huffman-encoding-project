@@ -12,7 +12,7 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXE = os.path.join(ROOT, "huffman.exe" if os.name == "nt" else "huffman")
+EXE = os.path.join(ROOT, "hzip.exe" if os.name == "nt" else "hzip")
 SRC = [os.path.join(ROOT, "src", f) for f in ("main.c", "huffman.c", "file_io.c")]
 
 

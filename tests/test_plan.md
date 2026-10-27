@@ -32,13 +32,19 @@ To verify that the Huffman compression tool compresses files and decompresses th
 
 These tests are automated by `tests/run_tests.py`. Their actual pass/fail status will be recorded after the test script runs successfully.
 
+
+
 ## 4. Test Execution Status
 
-Tests will be executed after the program can run successfully in the testing environment.
+The following component tests were executed successfully. The full program test suite is still pending.
 
 | Test ID | Actual Result | Status |
 |---|---|---|
-| TC01–TC13 | Not yet verified | Pending |
+| CT01 | Frequency counts verified: A = 3, B = 1, C = 1 | PASS |
+| CT02 | Huffman tree constructed successfully; root frequency = 5 | PASS |
+| CT03 | Huffman code lengths verified: A = 1, B = 2, C = 2 | PASS |
+| TC01–TC13 | Full program tests not yet executed | Pending |
+
 
 ## 5. Acceptance Criteria
 

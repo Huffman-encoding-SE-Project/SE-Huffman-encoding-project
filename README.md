@@ -1,9 +1,10 @@
 # Huffman Encoding Project
 
-A C-based, lossless file compression tool using Huffman coding.
+A C-based, lossless file compression tool using Huffman coding. The program compresses files by assigning variable-length codes to bytes based on their frequencies and supports decompression to recover the original data.
 
-## Features
+## 1. Project Overview and Features
 
+### Features
 - Command-line file compression and decompression
 - Byte-frequency analysis
 - Huffman tree construction
@@ -14,7 +15,7 @@ A C-based, lossless file compression tool using Huffman coding.
 - Input validation and error handling
 - Support for text and binary files
 
-## Project Structure
+## 2. Project Structure
 
 ```text
 Huffman-encoding-project-SE/
@@ -25,79 +26,100 @@ Huffman-encoding-project-SE/
 │   ├── huffman.c
 │   └── huffman.h
 ├── tests/
+│   ├── test_frequency.c
+│   ├── test_tree.c
+│   ├── test_codes.c
 │   ├── test_plan.md
 │   └── run_tests.py
-├── README.md
+└── README.md
 ```
 
-## Requirements
+## 3. Requirements and Build Instructions
 
+### Requirements
 - GCC C compiler
-- Python 3 for running the test script
+- Python 3 for running the Python test runner
 - Windows, Linux, or another compatible environment
 
-## Build Instructions
+### Build
 
-Open a terminal in the project root directory and compile the C source files:
+Open a terminal in the project root directory and compile the C source files.
 
+**Linux:**
 ```bash
 gcc src/main.c src/file_io.c src/huffman.c -o hzip
 ```
 
-On Windows, the output executable can be named `hzip.exe`:
-
+**Windows:**
 ```powershell
 gcc src/main.c src/file_io.c src/huffman.c -o hzip.exe
 ```
 
-## Usage
-
-The program accepts the following command formats:
+## 4. How to Use the Program
 
 ### Compress a file
 
+**Linux:**
 ```bash
-hzip compress input_file output_file
+./hzip compress input_file output_file
+```
+
+**Windows:**
+```powershell
+.\hzip.exe compress input_file output_file
 ```
 
 ### Decompress a file
 
+**Linux:**
 ```bash
-hzip decompress compressed_file output_file
+./hzip decompress compressed_file output_file
 ```
 
-- `compress`: Compresses the input file and writes the compressed data to the output file.
-- `decompress`: Decompresses the input file and restores the original data to the output file.
+**Windows:**
+```powershell
+.\hzip.exe decompress compressed_file output_file
+```
 
-On Windows, use `hzip.exe` instead of `hzip` when running the executable directly.
+Replace `input_file`, `compressed_file`, and `output_file` with the required file paths.
 
-**Note:** These commands describe the implemented command-line interface. Successful execution and compression/decompression results are still pending verification.
+## 5. Testing and Verified Results
 
+### Verified Results
 
-## Testing
+| Test | Result |
+|---|---|
+| C compilation | Passed |
+| Command-line usage output | Passed |
+| Byte-frequency counting | Passed — A = 3, B = 1, C = 1 |
+| Huffman tree construction | Passed — root frequency = 5 |
+| Huffman code generation | Passed — A length = 1, B length = 2, C length = 2 |
+| Basic text-file compression | Passed |
+| Basic text-file decompression | Passed |
+| Original/restored file comparison | Passed — no differences found using `fc.exe /b` |
 
-The project includes a test plan and a Python test runner under the `tests/` directory.
+### Pending Tests
 
-To run the test script from the project root:
+The complete planned test suite has not yet been executed.
+
+- Empty-file and single-symbol cases
+- Larger text files and binary files
+- All possible byte values and random binary data
+- Invalid and truncated compressed files
+- Nonexistent input files and error handling
+- Complete functional and portability verification
+
+### Run the Test Script
+
+From the project root, run:
 
 ```bash
 python tests/run_tests.py
 ```
 
-### Test Results
+**Note:** In the basic test, the 15-byte text file became larger after compression because the header overhead exceeded the savings for such a small input. The original and decompressed files nevertheless matched byte-for-byte.
 
-| Check | Status |
-|---|---|
-| C compilation | Passed — compiled without errors |
-| Executable generation | Passed — `hzip.exe` was created |
-| Program execution | Blocked by Windows Code Integrity policy |
-| Compression functionality | Pending verification |
-| Decompression functionality | Pending verification |
-| Text and binary file tests | Pending verification |
-| Empty-file and single-symbol tests | Pending verification |
-| Invalid or corrupted input tests | Pending verification |
-
-Tests will be marked as passed only after their actual results have been verified.
+Only tests with verified results are marked as passed. The remaining tests must be executed before claiming complete verification.
 
 ## Team 9
 

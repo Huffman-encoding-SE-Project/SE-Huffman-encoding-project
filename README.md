@@ -117,6 +117,14 @@ From the project root, run:
 python tests/run_tests.py
 ```
 
+To run the C unit checks and compression/decompression round-trip on a specific file, pass its path:
+
+```bash
+python tests/run_tests.py path/to/input_file.txt
+```
+
+The runner rebuilds the program and C tests, reports frequency/tree/code checks, verifies the restored file byte-for-byte, and writes the report to `tests/results.txt`. Paths containing spaces should be quoted. The input file is read only; temporary compressed/restored files are removed after the check.
+
 **Note:** In the basic test, the 15-byte text file became larger after compression because the header overhead exceeded the savings for such a small input. The original and decompressed files nevertheless matched byte-for-byte.
 
 Only tests with verified results are marked as passed. The remaining tests must be executed before claiming complete verification.

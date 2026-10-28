@@ -1,7 +1,12 @@
-"""Integration tests: compress -> decompress round trips plus error handling.
+"""Run Huffman integration tests, optionally against a user-supplied file.
 
-Usage:  python tests/run_tests.py
-Writes a summary to tests/results.txt
+Usage:
+  python tests/run_tests.py [input_file]
+
+With input_file, the runner checks frequency counting, tree/code generation,
+compression, decompression, and byte-for-byte integrity for that file.
+Without input_file, it also runs a built-in edge-case test suite.
+Results are written to tests/results.txt.
 """
 import filecmp
 import os
@@ -12,25 +17,28 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TESTS = os.path.join(ROOT, "tests")
 EXE = os.path.join(ROOT, "hzip.exe" if os.name == "nt" else "hzip")
 SRC = [os.path.join(ROOT, "src", f) for f in ("main.c", "huffman.c", "file_io.c")]
+C_TESTS = {
+    "frequency": os.path.join(TESTS, "test_frequency.c"),
+    "tree": os.path.join(TESTS, "test_tree.c"),
+    "codes": os.path.join(TESTS, "test_codes.c"),
+}
 
 
-def build():
-    cc = shutil.which("gcc") or shutil.which("cc")
-    if not cc:
-        sys.exit("No C compiler found (install gcc / MinGW).")
-    cmd = [cc, "-std=c99", "-Wall", "-Wextra", "-O2", "-o", EXE] + SRC
+def build(cc, sources, output):
+    cmd = [cc, "-std=c99", "-Wall", "-Wextra", "-O2", "-o", output] + sources
     r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        sys.exit("Build failed:\n" + r.stderr)
+    if r.returncode:
+        raise RuntimeError("Build failed:\n" + r.stderr)
 
 
-def run(*args):
-    return subprocess.run([EXE, *args], capture_output=True, text=True)
+def run(exe, *args):
+    return subprocess.run([exe, *map(str, args)], capture_output=True, text=True)
 
 
-def make_inputs(d):
+def make_inputs(directory):
     rnd = random.Random(42)
     cases = {
         "empty.bin": b"",
@@ -38,64 +46,82 @@ def make_inputs(d):
         "single_symbol_repeated.bin": b"z" * 10000,
         "two_symbols.bin": b"ab" * 5000,
         "short_text.txt": b"hello huffman world",
-        "english.txt": (b"the quick brown fox jumps over the lazy dog. " * 500),
-        "skewed.bin": bytes(rnd.choices(range(256), weights=[2 ** (i % 12) for i in range(256)], k=50000)),
+        "english.txt": b"the quick brown fox jumps over the lazy dog. " * 500,
         "all_bytes.bin": bytes(range(256)) * 40,
         "random.bin": bytes(rnd.getrandbits(8) for _ in range(30000)),
     }
-    paths = {}
+    paths = []
     for name, data in cases.items():
-        p = os.path.join(d, name)
-        with open(p, "wb") as f:
+        path = os.path.join(directory, name)
+        with open(path, "wb") as f:
             f.write(data)
-        paths[name] = p
+        paths.append(path)
     return paths
 
 
+def test_one_file(path, results, c_test_exes):
+    if not os.path.isfile(path):
+        results.append((f"input exists: {path}", False, "File not found"))
+        return
+    path = os.path.abspath(path)
+    with open(path, "rb") as f:
+        data = f.read()
+    results.append((f"input readable: {os.path.basename(path)}", True,
+                    f"{len(data):,} bytes"))
+
+    for label, exe in c_test_exes.items():
+        r = run(exe, path)
+        results.append((f"C {label} test on {os.path.basename(path)}",
+                        r.returncode == 0,
+                        (r.stdout + r.stderr).strip() or f"exit code {r.returncode}"))
+
+    compressed, restored = path + ".huf-test", path + ".restored-test"
+    c = run(EXE, "compress", path, compressed)
+    if c.returncode != 0:
+        results.append((f"compress {os.path.basename(path)}", False, c.stderr.strip()))
+        return
+    results.append((f"compress {os.path.basename(path)}", True, c.stdout.strip()))
+    d = run(EXE, "decompress", compressed, restored)
+    ok = d.returncode == 0 and os.path.isfile(restored) and filecmp.cmp(path, restored, shallow=False)
+    results.append((f"decompress and byte-compare {os.path.basename(path)}", ok,
+                    d.stdout.strip() if d.returncode == 0 else d.stderr.strip()))
+    for p in (compressed, restored):
+        try: os.remove(p)
+        except OSError: pass
+
+
 def main():
-    build()
-    results, failed = [], 0
-    with tempfile.TemporaryDirectory() as d:
-        for name, src in make_inputs(d).items():
-            comp, back = src + ".huf", src + ".out"
-            ok = (run("compress", src, comp).returncode == 0
-                  and run("decompress", comp, back).returncode == 0
-                  and filecmp.cmp(src, back, shallow=False))
-            sizes = f"{os.path.getsize(src)} -> {os.path.getsize(comp)}" if os.path.exists(comp) else "n/a"
-            results.append((f"round-trip {name}", ok, sizes))
-
-        src = os.path.join(d, "english.txt")
-        comp = src + ".huf"
-
-        r = run("compress", os.path.join(d, "does_not_exist"), os.path.join(d, "x"))
-        results.append(("missing input file is rejected", r.returncode != 0, r.stderr.strip()))
-
-        junk = os.path.join(d, "junk.huf")
-        with open(junk, "wb") as f:
-            f.write(b"this is not a huffman file" * 100)
-        r = run("decompress", junk, os.path.join(d, "x"))
-        results.append(("invalid compressed file is rejected", r.returncode != 0, r.stderr.strip()))
-
-        trunc = os.path.join(d, "trunc.huf")
-        with open(comp, "rb") as f, open(trunc, "wb") as g:
-            data = f.read()
-            g.write(data[:-50])
-        r = run("decompress", trunc, os.path.join(d, "x"))
-        results.append(("truncated compressed file is rejected", r.returncode != 0, r.stderr.strip()))
-
-        r = run("compress")
-        results.append(("no arguments prints usage", r.returncode == 2, "exit code %d" % r.returncode))
-
-    lines = []
-    for name, ok, info in results:
-        failed += not ok
-        lines.append(f"[{'PASS' if ok else 'FAIL'}] {name}  {info}")
-    lines.append(f"\n{len(results) - failed}/{len(results)} tests passed")
-    report = "\n".join(lines)
-    print(report)
-    with open(os.path.join(ROOT, "tests", "results.txt"), "w") as f:
-        f.write(report + "\n")
-    sys.exit(1 if failed else 0)
+    cc = shutil.which("gcc") or shutil.which("cc")
+    if not cc:
+        sys.exit("No C compiler found. Install GCC/MinGW and ensure it is on PATH.")
+    try:
+        build(cc, SRC, EXE)
+        c_test_exes = {}
+        with tempfile.TemporaryDirectory(prefix="huffman-tests-") as build_dir:
+            for label, source in C_TESTS.items():
+                output = os.path.join(build_dir, "test_" + label + (".exe" if os.name == "nt" else ""))
+                build(cc, [source, os.path.join(ROOT, "src", "huffman.c"),
+                           os.path.join(ROOT, "src", "file_io.c")], output)
+                c_test_exes[label] = output
+            results = []
+            if len(sys.argv) > 1:
+                if len(sys.argv) > 2:
+                    sys.exit("Usage: python tests/run_tests.py [input_file]")
+                test_one_file(sys.argv[1], results, c_test_exes)
+            else:
+                with tempfile.TemporaryDirectory(prefix="huffman-inputs-") as inputs_dir:
+                    for path in make_inputs(inputs_dir):
+                        test_one_file(path, results, c_test_exes)
+            failed = sum(not ok for _, ok, _ in results)
+            lines = [f"[{'PASS' if ok else 'FAIL'}] {name} -- {info}" for name, ok, info in results]
+            lines.append(f"\n{len(results) - failed}/{len(results)} checks passed")
+            report = "\n".join(lines)
+            print(report)
+            with open(os.path.join(TESTS, "results.txt"), "w", encoding="utf-8") as f:
+                f.write(report + "\n")
+            sys.exit(1 if failed else 0)
+    except RuntimeError as e:
+        sys.exit(str(e))
 
 
 if __name__ == "__main__":

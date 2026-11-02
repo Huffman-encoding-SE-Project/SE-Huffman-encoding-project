@@ -95,6 +95,56 @@ def test_one_file(path, results, c_test_exes):
         try: os.remove(p)
         except OSError: pass
 
+# Issue #13: Reject corrupted and truncated compressed files
+
+def test_invalid_compressed_files(results):
+    """Verify that malformed and truncated compressed files are rejected."""
+
+    with tempfile.TemporaryDirectory(prefix="huffman-invalid-") as temp:
+        original = os.path.join(temp, "original.bin")
+        compressed = os.path.join(temp, "original.huf")
+
+        with open(original, "wb") as f:
+            f.write(b"corruption detection test " * 20)
+
+        c = run(EXE, "compress", original, compressed)
+        if c.returncode != 0:
+            results.append(("prepare invalid-file tests", False,
+                            c.stderr.strip()))
+            return
+
+        with open(compressed, "rb") as f:
+            valid_data = f.read()
+
+        cases = {
+            "truncated header": valid_data[:20],
+            "truncated payload": valid_data[:-1],
+            "extra trailing byte": valid_data + b"\x00",
+            "corrupted magic": b"BAD!" + valid_data[4:],
+        }
+
+        for name, data in cases.items():
+            bad_file = os.path.join(temp, "bad.huf")
+            output = os.path.join(temp, "restored.bin")
+
+            with open(bad_file, "wb") as f:
+                f.write(data)
+
+            try:
+                os.remove(output)
+            except FileNotFoundError:
+                pass
+
+            d = run(EXE, "decompress", bad_file, output)
+            rejected = d.returncode != 0
+
+            results.append((
+                f"reject {name}",
+                rejected,
+                d.stderr.strip() if rejected else "Invalid file was accepted"
+            ))
+
+
 
 def main():
     cc = shutil.which("gcc") or shutil.which("cc")
@@ -109,23 +159,35 @@ def main():
                 build(cc, [source, os.path.join(ROOT, "src", "huffman.c"),
                            os.path.join(ROOT, "src", "file_io.c")], output)
                 c_test_exes[label] = output
+
             results = []
+
             if len(sys.argv) > 1:
                 if len(sys.argv) > 2:
                     sys.exit("Usage: python tests/run_tests.py [input_file]")
+
                 test_one_file(sys.argv[1], results, c_test_exes)
+
             else:
                 with tempfile.TemporaryDirectory(prefix="huffman-inputs-") as inputs_dir:
                     for path in make_inputs(inputs_dir):
                         test_one_file(path, results, c_test_exes)
+
+            # Issue #13: Run corrupted-file tests once.
+            test_invalid_compressed_files(results)
+
             failed = sum(not ok for _, ok, _ in results)
+
             lines = [f"[{'PASS' if ok else 'FAIL'}] {name} -- {info}" for name, ok, info in results]
             lines.append(f"\n{len(results) - failed}/{len(results)} checks passed")
             report = "\n".join(lines)
             print(report)
+
             with open(os.path.join(TESTS, "results.txt"), "w", encoding="utf-8") as f:
                 f.write(report + "\n")
+
             sys.exit(1 if failed else 0)
+
     except RuntimeError as e:
         sys.exit(str(e))
 

@@ -46,18 +46,27 @@ def make_inputs(directory):
         "empty.bin": b"",
         "single_byte.bin": b"A",
         "single_symbol_repeated.bin": b"z" * 10000,
+
+        # Issue #12: Additional single-symbol edge cases
+        "single_null_symbol.bin": bytes([0x00]) * 257,
+        "single_high_byte_symbol.bin": bytes([0xFF]) * 257,
+        "single_symbol_odd_length.bin": bytes([0xFE]) * 9,
+
         "two_symbols.bin": b"ab" * 5000,
+        "skewed_binary.bin": bytes([0x00]) * 20000 + bytes([0xFF]) * 100,
         "short_text.txt": b"hello huffman world",
         "english.txt": b"the quick brown fox jumps over the lazy dog. " * 500,
         "all_bytes.bin": bytes(range(256)) * 40,
         "random.bin": bytes(rnd.getrandbits(8) for _ in range(30000)),
     }
+
     paths = []
     for name, data in cases.items():
         path = os.path.join(directory, name)
         with open(path, "wb") as f:
             f.write(data)
         paths.append(path)
+
     return paths
 
 
@@ -70,24 +79,37 @@ def test_one_file(path, results, c_test_exes):
     with open(path, "rb") as f:
         data = f.read()
 
-    results.append((f"input readable: {os.path.basename(path)}", True,
-                    f"{len(data):,} bytes"))
+    results.append((
+        f"input readable: {os.path.basename(path)}",
+        True,
+        f"{len(data):,} bytes"
+    ))
 
     for label, exe in c_test_exes.items():
         r = run(exe, path)
-        results.append((f"C {label} test on {os.path.basename(path)}",
-                        r.returncode == 0,
-                        (r.stdout + r.stderr).strip() or f"exit code {r.returncode}"))
+        results.append((
+            f"C {label} test on {os.path.basename(path)}",
+            r.returncode == 0,
+            (r.stdout + r.stderr).strip() or f"exit code {r.returncode}"
+        ))
 
     compressed = path + ".huf-test"
     restored = path + ".restored-test"
 
     c = run(EXE, "compress", path, compressed)
     if c.returncode != 0:
-        results.append((f"compress {os.path.basename(path)}", False, c.stderr.strip()))
+        results.append((
+            f"compress {os.path.basename(path)}",
+            False,
+            c.stderr.strip()
+        ))
         return
 
-    results.append((f"compress {os.path.basename(path)}", True, c.stdout.strip()))
+    results.append((
+        f"compress {os.path.basename(path)}",
+        True,
+        c.stdout.strip()
+    ))
 
     d = run(EXE, "decompress", compressed, restored)
     ok = (
@@ -95,8 +117,11 @@ def test_one_file(path, results, c_test_exes):
         and os.path.isfile(restored)
         and filecmp.cmp(path, restored, shallow=False)
     )
-    results.append((f"decompress and byte-compare {os.path.basename(path)}", ok,
-                    d.stdout.strip() if d.returncode == 0 else d.stderr.strip()))
+    results.append((
+        f"decompress and byte-compare {os.path.basename(path)}",
+        ok,
+        d.stdout.strip() if d.returncode == 0 else d.stderr.strip()
+    ))
 
     for p in (compressed, restored):
         try:
@@ -105,62 +130,56 @@ def test_one_file(path, results, c_test_exes):
             pass
 
 
+# Issue #13: Reject corrupted and truncated compressed files
 def test_invalid_compressed_files(results):
-    """Check that invalid headers and truncated compressed data are rejected."""
-    with tempfile.TemporaryDirectory(prefix="huffman-invalid-") as directory:
-        invalid_path = os.path.join(directory, "invalid.huf")
-        invalid_output = os.path.join(directory, "invalid-restored.bin")
+    """Verify that malformed and truncated compressed files are rejected."""
 
-        # Invalid magic/header.
-        with open(invalid_path, "wb") as f:
-            f.write(b"NOPE" + b"\x00" * 32)
+    with tempfile.TemporaryDirectory(prefix="huffman-invalid-") as temp:
+        original = os.path.join(temp, "original.bin")
+        compressed = os.path.join(temp, "original.huf")
 
-        invalid_result = run(EXE, "decompress", invalid_path, invalid_output)
-        invalid_rejected = (
-            invalid_result.returncode != 0
-            and not os.path.exists(invalid_output)
-        )
-        results.append((
-            "reject invalid compressed file (TC11)",
-            invalid_rejected,
-            f"exit code {invalid_result.returncode}"
-        ))
+        with open(original, "wb") as f:
+            f.write(b"corruption detection test " * 20)
 
-        # Create a valid compressed file, then remove its final byte.
-        original_path = os.path.join(directory, "original.bin")
-        compressed_path = os.path.join(directory, "valid.huf")
-        truncated_path = os.path.join(directory, "truncated.huf")
-        truncated_output = os.path.join(directory, "truncated-restored.bin")
-
-        with open(original_path, "wb") as f:
-            f.write(b"truncated compressed data test " * 20)
-
-        compression = run(EXE, "compress", original_path, compressed_path)
-        if compression.returncode != 0:
+        c = run(EXE, "compress", original, compressed)
+        if c.returncode != 0:
             results.append((
-                "reject truncated compressed file (TC12)",
+                "prepare invalid-file tests",
                 False,
-                "Could not create valid compressed test input"
+                c.stderr.strip()
             ))
             return
 
-        with open(compressed_path, "rb") as f:
-            compressed_data = f.read()
+        with open(compressed, "rb") as f:
+            valid_data = f.read()
 
-        # Keep the header but remove one byte from the compressed payload.
-        with open(truncated_path, "wb") as f:
-            f.write(compressed_data[:-1])
+        cases = {
+            "truncated header": valid_data[:20],
+            "truncated payload": valid_data[:-1],
+            "extra trailing byte": valid_data + b"\x00",
+            "corrupted magic": b"BAD!" + valid_data[4:],
+        }
 
-        truncated_result = run(EXE, "decompress", truncated_path, truncated_output)
-        truncated_rejected = (
-            truncated_result.returncode != 0
-            and not os.path.exists(truncated_output)
-        )
-        results.append((
-            "reject truncated compressed file (TC12)",
-            truncated_rejected,
-            f"exit code {truncated_result.returncode}"
-        ))
+        for name, data in cases.items():
+            bad_file = os.path.join(temp, "bad.huf")
+            output = os.path.join(temp, "restored.bin")
+
+            with open(bad_file, "wb") as f:
+                f.write(data)
+
+            try:
+                os.remove(output)
+            except FileNotFoundError:
+                pass
+
+            d = run(EXE, "decompress", bad_file, output)
+            rejected = d.returncode != 0
+
+            results.append((
+                f"reject {name}",
+                rejected,
+                d.stderr.strip() if rejected else "Invalid file was accepted"
+            ))
 
 
 def main():
@@ -194,12 +213,14 @@ def main():
             if len(sys.argv) > 1:
                 if len(sys.argv) > 2:
                     sys.exit("Usage: python tests/run_tests.py [input_file]")
+
                 test_one_file(sys.argv[1], results, c_test_exes)
             else:
                 with tempfile.TemporaryDirectory(prefix="huffman-inputs-") as inputs_dir:
                     for path in make_inputs(inputs_dir):
                         test_one_file(path, results, c_test_exes)
 
+                # Run corrupted-file tests once, after the normal test cases.
                 test_invalid_compressed_files(results)
 
             failed = sum(not ok for _, ok, _ in results)
@@ -211,6 +232,7 @@ def main():
             report = "\n".join(lines)
 
             print(report)
+
             with open(os.path.join(TESTS, "results.txt"), "w", encoding="utf-8") as f:
                 f.write(report + "\n")
 

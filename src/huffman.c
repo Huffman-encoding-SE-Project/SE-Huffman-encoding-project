@@ -13,7 +13,9 @@ void huf_count_freq(const uint8_t *data, size_t n, uint32_t freq[HUF_SYMBOLS])
 static HuffNode *new_node(uint32_t freq, int symbol, HuffNode *l, HuffNode *r)
 {
     HuffNode *n = malloc(sizeof(HuffNode));
-    if (!n) return NULL;
+    if (!n)
+        return NULL;
+
     n->freq = freq;
     n->symbol = symbol;
     n->left = l;
@@ -23,7 +25,9 @@ static HuffNode *new_node(uint32_t freq, int symbol, HuffNode *l, HuffNode *r)
 
 void huf_free_tree(HuffNode *root)
 {
-    if (!root) return;
+    if (!root)
+        return;
+
     huf_free_tree(root->left);
     huf_free_tree(root->right);
     free(root);
@@ -38,15 +42,22 @@ HuffNode *huf_build_tree(const uint32_t freq[HUF_SYMBOLS])
     for (int s = 0; s < HUF_SYMBOLS; s++) {
         if (freq[s] > 0) {
             pool[count] = new_node(freq[s], s, NULL, NULL);
-            if (!pool[count]) goto fail;
+            if (!pool[count])
+                goto fail;
             count++;
         }
     }
-    if (count == 0) return NULL;
+
+    if (count == 0)
+        return NULL;
 
     while (count > 1) {
         int a = 0, b = 1;
-        if (pool[b]->freq < pool[a]->freq) { a = 1; b = 0; }
+
+        if (pool[b]->freq < pool[a]->freq) {
+            a = 1;
+            b = 0;
+        }
 
         for (int i = 2; i < count; i++) {
             if (pool[i]->freq < pool[a]->freq) {
@@ -59,10 +70,12 @@ HuffNode *huf_build_tree(const uint32_t freq[HUF_SYMBOLS])
 
         HuffNode *parent = new_node(pool[a]->freq + pool[b]->freq, -1,
                                     pool[a], pool[b]);
-        if (!parent) goto fail;
+        if (!parent)
+            goto fail;
 
         int lo = a < b ? a : b;
         int hi = a < b ? b : a;
+
         pool[lo] = parent;
         pool[hi] = pool[count - 1];
         count--;
@@ -80,6 +93,7 @@ static void walk(const HuffNode *n, uint8_t *path, int depth, HuffCode codes[])
 {
     if (!n->left && !n->right) {
         HuffCode *c = &codes[n->symbol];
+
         if (depth == 0) {
             c->bits[0] = 0;
             c->length = 1;
@@ -92,6 +106,7 @@ static void walk(const HuffNode *n, uint8_t *path, int depth, HuffCode codes[])
 
     path[depth] = 0;
     walk(n->left, path, depth + 1, codes);
+
     path[depth] = 1;
     walk(n->right, path, depth + 1, codes);
 }
@@ -99,8 +114,10 @@ static void walk(const HuffNode *n, uint8_t *path, int depth, HuffCode codes[])
 void huf_build_codes(const HuffNode *root, HuffCode codes[HUF_SYMBOLS])
 {
     uint8_t path[HUF_SYMBOLS];
+
     memset(codes, 0, HUF_SYMBOLS * sizeof(HuffCode));
-    if (root) walk(root, path, 0, codes);
+    if (root)
+        walk(root, path, 0, codes);
 }
 
 static void put_u32(uint8_t *p, uint32_t v)
@@ -118,16 +135,20 @@ static void put_u64(uint8_t *p, uint64_t v)
 static uint32_t get_u32(const uint8_t *p)
 {
     uint32_t v = 0;
+
     for (int i = 0; i < 4; i++)
         v |= (uint32_t)p[i] << (8 * i);
+
     return v;
 }
 
 static uint64_t get_u64(const uint8_t *p)
 {
     uint64_t v = 0;
+
     for (int i = 0; i < 8; i++)
         v |= (uint64_t)p[i] << (8 * i);
+
     return v;
 }
 
@@ -149,6 +170,7 @@ HufStatus huf_compress(const uint8_t *in, size_t n, uint8_t **out, size_t *out_n
 
     huf_count_freq(in, n, freq);
     root = huf_build_tree(freq);
+
     if (n > 0 && !root)
         return HUF_ERR_MEMORY;
 
@@ -164,13 +186,23 @@ HufStatus huf_compress(const uint8_t *in, size_t n, uint8_t **out, size_t *out_n
     for (int s = 0; s < HUF_SYMBOLS; s++)
         total_bits += (uint64_t)freq[s] * (uint64_t)codes[s].length;
 
-    size_t payload = (size_t)((total_bits + 7) / 8);
-    if (payload > SIZE_MAX - HUF_HEADER_SIZE - 1) {
+    /* Prevent overflow while calculating payload and total buffer size. */
+    if (total_bits > UINT64_MAX - 7) {
         st = HUF_ERR_TOO_LARGE;
         goto done;
     }
 
-    uint8_t *buf = calloc(HUF_HEADER_SIZE + payload + 1, 1);
+    uint64_t payload64 = (total_bits + 7) / 8;
+
+    if (payload64 > SIZE_MAX - HUF_HEADER_SIZE - 1) {
+        st = HUF_ERR_TOO_LARGE;
+        goto done;
+    }
+
+    size_t payload = (size_t)payload64;
+    size_t buffer_size = HUF_HEADER_SIZE + payload + 1;
+
+    uint8_t *buf = calloc(buffer_size, 1);
     if (!buf) {
         st = HUF_ERR_MEMORY;
         goto done;
@@ -187,6 +219,7 @@ HufStatus huf_compress(const uint8_t *in, size_t n, uint8_t **out, size_t *out_n
 
     for (size_t i = 0; i < n; i++) {
         const HuffCode *c = &codes[in[i]];
+
         for (int b = 0; b < c->length; b++, bitpos++) {
             if (c->bits[b])
                 p[bitpos >> 3] |= (uint8_t)(0x80 >> (bitpos & 7));
@@ -230,6 +263,9 @@ HufStatus huf_decompress(const uint8_t *in, size_t n, uint8_t **out, size_t *out
         return HUF_ERR_BAD_FORMAT;
 
     if (orig == 0) {
+        if (n != HUF_HEADER_SIZE)
+            return HUF_ERR_BAD_FORMAT;
+
         uint8_t *buf = malloc(1);
         if (!buf)
             return HUF_ERR_MEMORY;
@@ -283,9 +319,17 @@ HufStatus huf_decompress(const uint8_t *in, size_t n, uint8_t **out, size_t *out
         buf[i] = (uint8_t)cur->symbol;
     }
 
-    huf_free_tree(root);
+    /* Reject unexpected trailing bytes after the encoded data. */
+    size_t expected_payload = (bitpos + 7) / 8;
+    size_t actual_payload = n - HUF_HEADER_SIZE;
+
+    if (actual_payload != expected_payload)
+        goto bad_format;
+
     *out = buf;
     *out_n = (size_t)orig;
+
+    huf_free_tree(root);
     return HUF_OK;
 
 trunc:
@@ -308,5 +352,6 @@ const char *huf_strerror(HufStatus s)
     case HUF_ERR_BAD_FORMAT: return "not a valid compressed file";
     case HUF_ERR_TRUNCATED:  return "compressed data is truncated";
     }
+
     return "unknown error";
 }

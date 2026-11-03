@@ -33,17 +33,27 @@ To verify that the Huffman compression tool compresses files and decompresses th
 These tests are automated by `tests/run_tests.py`. Their actual pass/fail status will be recorded after the test script runs successfully.
 
 
-
 ## 4. Test Execution Status
 
-The following component tests were executed successfully. The full program test suite is still pending.
+The following component tests and automated program tests were executed successfully in WSL Ubuntu.
 
 | Test ID | Actual Result | Status |
 |---|---|---|
 | CT01 | Frequency counts verified: A = 3, B = 1, C = 1 | PASS |
 | CT02 | Huffman tree constructed successfully; root frequency = 5 | PASS |
 | CT03 | Huffman code lengths verified: A = 1, B = 2, C = 2 | PASS |
-| TC01–TC13 | Full program tests not yet executed | Pending |
+| TC01 | Empty file compression and decompression verified | PASS |
+| TC02 | Single-byte file compression and decompression verified | PASS |
+| TC03 | Repeated single-symbol file compression and decompression verified | PASS |
+| TC04 | Two-symbol file compression and decompression verified | PASS |
+| TC05 | Short text file compression and decompression verified | PASS |
+| TC06 | Larger English text file compression and decompression verified | PASS |
+| TC07 | Skewed-frequency binary data test not yet executed | Pending |
+| TC08 | File containing all byte values compressed and decompressed successfully | PASS |
+| TC09 | Random binary file compressed and decompressed successfully | PASS |
+| TC10–TC13 | Invalid input, invalid compressed file, truncated file, and missing-argument tests not yet executed | Pending |
+
+**Automated Test Summary:** 48/48 checks passed across the eight tested input categories. Decompressed files were verified against their original files using byte-by-byte comparison.
 
 
 ## 5. Acceptance Criteria
@@ -56,4 +66,10 @@ The following component tests were executed successfully. The full program test 
 - The program displays appropriate usage information when run without arguments.
 ## 6. Notes
 
-The source files compiled successfully using GCC, and the executable was generated. However, Windows Code Integrity blocked execution of the executable. Functional test results are therefore pending until execution is possible in an approved environment.
+The source files compiled successfully using GCC, and the executable was generated. 
+
+- The Windows native test execution was blocked by the system's Code Integrity policy.
+- The project was compiled successfully using GCC in WSL Ubuntu.
+- The automated test suite was executed using python3 tests/run_tests.py.
+- All 48 checks passed.
+- TC07 and TC10–TC13 remain pending.

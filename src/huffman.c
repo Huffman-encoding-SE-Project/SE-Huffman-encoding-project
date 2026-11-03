@@ -97,6 +97,16 @@ static uint64_t get_u64(const uint8_t *p) { uint64_t v = 0; for (int i = 0; i < 
 
 HufStatus huf_compress(const uint8_t *in, size_t n, uint8_t **out, size_t *out_n)
 {
+
+    if (!out || !out_n)
+        return HUF_ERR_BAD_FORMAT;
+
+    *out = NULL;
+    *out_n = 0;
+
+    if (!in && n > 0)
+        return HUF_ERR_BAD_FORMAT;
+
     uint32_t freq[HUF_SYMBOLS];
     HuffCode *codes = NULL;
     HuffNode *root = NULL;
@@ -116,9 +126,28 @@ HufStatus huf_compress(const uint8_t *in, size_t n, uint8_t **out, size_t *out_n
     for (int s = 0; s < HUF_SYMBOLS; s++)
         total_bits += (uint64_t)freq[s] * (uint64_t)codes[s].length;
 
-    size_t payload = (size_t)((total_bits + 7) / 8);
-    uint8_t *buf = calloc(HUF_HEADER_SIZE + payload + 1, 1);
-    if (!buf) { st = HUF_ERR_MEMORY; goto done; }
+    /* Prevent overflow while calculating payload and total buffer size. */
+    if (total_bits > UINT64_MAX - 7) {
+        st = HUF_ERR_TOO_LARGE;
+        goto done;
+    }
+
+    uint64_t payload64 = (total_bits + 7) / 8;
+
+    if (payload64 > SIZE_MAX - HUF_HEADER_SIZE - 1) {
+        st = HUF_ERR_TOO_LARGE;
+        goto done;
+    }
+
+    size_t payload = (size_t)payload64;
+    size_t buffer_size = HUF_HEADER_SIZE + payload + 1;
+
+    /* Allocate the compressed output buffer and handle allocation failure. */
+    uint8_t *buf = calloc(buffer_size, 1);
+    if (!buf) {
+        st = HUF_ERR_MEMORY;
+        goto done;
+    }
 
     memcpy(buf, HUF_MAGIC, 4);
     put_u64(buf + 4, (uint64_t)n);
@@ -143,6 +172,17 @@ done:
 
 HufStatus huf_decompress(const uint8_t *in, size_t n, uint8_t **out, size_t *out_n)
 {
+
+
+    if (!out || !out_n)
+        return HUF_ERR_BAD_FORMAT;
+
+    *out = NULL;
+    *out_n = 0;
+
+    if (!in)
+        return HUF_ERR_BAD_FORMAT;
+
     if (n < HUF_HEADER_SIZE || memcmp(in, HUF_MAGIC, 4) != 0)
         return HUF_ERR_BAD_FORMAT;
 
@@ -154,6 +194,10 @@ HufStatus huf_decompress(const uint8_t *in, size_t n, uint8_t **out, size_t *out
         sum += freq[s];
     }
     if (sum != orig) return HUF_ERR_BAD_FORMAT;
+
+    /* Ensure the original size fits in size_t before allocating memory. */
+    if (orig > (uint64_t)(SIZE_MAX - 1))
+        return HUF_ERR_TOO_LARGE;
 
     uint8_t *buf = malloc((size_t)orig + 1);
     if (!buf) return HUF_ERR_MEMORY;
@@ -167,7 +211,7 @@ HufStatus huf_decompress(const uint8_t *in, size_t n, uint8_t **out, size_t *out
         *out_n = 0;
         return HUF_OK;
     }
-    
+
     HuffNode *root = huf_build_tree(freq);
     if (!root) { free(buf); return HUF_ERR_MEMORY; }
 

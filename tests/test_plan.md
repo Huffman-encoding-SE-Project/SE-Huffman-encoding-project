@@ -34,7 +34,10 @@ These tests are automated by `tests/run_tests.py`.
 
 ## 4. Test Execution Status
 
-The component tests and automated program tests were executed successfully. The automated test suite was run using `python3 tests/run_tests.py`.
+
+The component tests and automated program tests were executed successfully. The automated test suite was run using `python3 tests/run_tests.py
+
+The following component-level tests and automated program tests were executed successfully.
 
 | Test ID | Actual Result | Status |
 |---|---|---|
@@ -47,15 +50,16 @@ The component tests and automated program tests were executed successfully. The 
 | TC04 | Two-symbol file compression and decompression verified | PASS |
 | TC05 | Short text file compression and decompression verified | PASS |
 | TC06 | Larger English text file compression and decompression verified | PASS |
-| TC07 | Skewed-frequency binary data compressed and decompressed successfully; output matched the original | PASS |
+| TC07 | Skewed-frequency binary data compressed and decompressed successfully | PASS |
 | TC08 | File containing all byte values compressed and decompressed successfully | PASS |
-| TC09 | Random binary file compressed and decompressed successfully; output matched the original | PASS |
-| TC10 | Nonexistent input file was rejected with a nonzero exit code | PASS |
-| TC11 | Invalid compressed file was rejected | PASS |
-| TC12 | Truncated compressed file was rejected | PASS |
-| TC13 | Program returned exit code 2 and displayed usage information when run without arguments | PASS |
+| TC09 | Random binary file compressed and decompressed successfully | PASS |
+| TC10 | Nonexistent input file handled with a nonzero exit code | PASS |
+| TC11 | Invalid compressed-file input rejected | PASS |
+| TC12 | Truncated compressed-file input rejected | PASS |
+| TC13 | Missing arguments handled with exit code 2 and usage information | PASS |
 
-**Automated Test Summary:** 78/78 checks passed. Decompressed files were verified against their original files using byte-by-byte comparison.
+**Automated Test Summary:** 78/78 checks passed. The updated automated test suite covered normal inputs, binary data, edge cases and malformed compressed files. Successful compression and decompression cases were verified through byte-by-byte comparison.
+
 
 ## 5. Acceptance Criteria
 
@@ -68,8 +72,13 @@ The component tests and automated program tests were executed successfully. The 
 
 ## 6. Notes
 
-- The source files compiled successfully using GCC, and the executable was generated.
-- Windows native test execution was blocked by the system's Code Integrity policy.
-- The project was compiled successfully using GCC in WSL Ubuntu.
-- The automated test suite was executed using `python3 tests/run_tests.py`.
-- All 78 checks passed.
+- The integrated source files compiled successfully using GCC, and the executable was generated.
+- The initial Windows native test execution on the user's system was blocked by the Windows Code Integrity policy.
+- WSL Ubuntu was used as an alternative environment for compilation and testing on the affected system.
+- A teammate also successfully executed the automated test suite using VS Code PowerShell on Windows.
+- The updated automated test suite was executed using 'python tests/run_tests.py'
+- **78/78 automated checks passed** in the latest integrated test run.
+- TC01–TC10 and TC13 passed.
+- Malformed compressed-file tests, including invalid headers and truncated data, passed in the updated suite.
+- CT01–CT03 component-level tests passed successfully.
+- Compression results may vary depending on the input data. Small or random files may become larger due to header and metadata overhead.

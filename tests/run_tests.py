@@ -44,6 +44,12 @@ def make_inputs(directory):
         "empty.bin": b"",
         "single_byte.bin": b"A",
         "single_symbol_repeated.bin": b"z" * 10000,
+
+        # Issue #12: Additional single-symbol edge cases
+        "single_null_symbol.bin": bytes([0x00]) * 257,
+        "single_high_byte_symbol.bin": bytes([0xFF]) * 257,
+        "single_symbol_odd_length.bin": bytes([0xFE]) * 9,
+
         "two_symbols.bin": b"ab" * 5000,
         "short_text.txt": b"hello huffman world",
         "english.txt": b"the quick brown fox jumps over the lazy dog. " * 500,

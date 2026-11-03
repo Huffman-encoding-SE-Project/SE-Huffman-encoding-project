@@ -58,7 +58,7 @@ The following component-level tests and automated program tests were executed su
 | TC12 | Truncated compressed-file input rejected | PASS |
 | TC13 | Missing arguments handled with exit code 2 and usage information | PASS |
 
-**Automated Test Summary:** 78/78 checks passed. The updated automated test suite covered normal inputs, binary data, edge cases and malformed compressed files. Successful compression and decompression cases were verified through byte-by-byte comparison.
+**Automated Test Summary:** 90/90 checks passed. The updated automated test suite covered normal inputs, binary data, edge cases and malformed compressed files. Successful compression and decompression cases were verified through byte-by-byte comparison.
 
 
 ## 5. Acceptance Criteria
@@ -77,7 +77,7 @@ The following component-level tests and automated program tests were executed su
 - WSL Ubuntu was used as an alternative environment for compilation and testing on the affected system.
 - A teammate also successfully executed the automated test suite using VS Code PowerShell on Windows.
 - The updated automated test suite was executed using 'python tests/run_tests.py'
-- **78/78 automated checks passed** in the latest integrated test run.
+- **90/90 automated checks passed** in the latest integrated test run.
 - TC01–TC10 and TC13 passed.
 - Malformed compressed-file tests, including invalid headers and truncated data, passed in the updated suite.
 - CT01–CT03 component-level tests passed successfully.

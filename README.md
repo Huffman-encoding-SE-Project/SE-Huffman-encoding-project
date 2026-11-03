@@ -101,7 +101,7 @@ Replace `input_file`, `compressed_file`, and `output_file` with the required fil
 
 The automated test runner was executed successfully in WSL Ubuntu.
 
-- **78/78 checks passed** in the latest recorded run.
+- **90/90 checks passed** in the latest recorded run.
 - Tested empty files, single-byte files, repeated symbols, two-symbol files, short and larger text files, skewed-frequency binary data, all byte values, and random binary data.
 - Invalid-input handling was tested, including nonexistent input files, invalid compressed files, truncated headers and payloads, corrupted magic values, extra trailing bytes, and running without arguments.
 - Decompressed files were verified against their originals using byte-by-byte comparisons.

@@ -158,8 +158,16 @@ HufStatus huf_decompress(const uint8_t *in, size_t n, uint8_t **out, size_t *out
     uint8_t *buf = malloc((size_t)orig + 1);
     if (!buf) return HUF_ERR_MEMORY;
 
-    if (orig == 0) { *out = buf; *out_n = 0; return HUF_OK; }
-
+    if (orig == 0) {
+        if (n != HUF_HEADER_SIZE) {
+            free(buf);
+            return HUF_ERR_BAD_FORMAT;
+        }
+        *out = buf;
+        *out_n = 0;
+        return HUF_OK;
+    }
+    
     HuffNode *root = huf_build_tree(freq);
     if (!root) { free(buf); return HUF_ERR_MEMORY; }
 
@@ -181,6 +189,16 @@ HufStatus huf_decompress(const uint8_t *in, size_t n, uint8_t **out, size_t *out
             }
         }
         buf[i] = (uint8_t)cur->symbol;
+    }
+    
+        /* Reject unexpected trailing bytes after the encoded data. */
+    size_t expected_payload = (bitpos + 7) / 8;
+    size_t actual_payload = n - HUF_HEADER_SIZE;
+
+    if (actual_payload != expected_payload) {
+        huf_free_tree(root);
+        free(buf);
+        return HUF_ERR_BAD_FORMAT;
     }
 
     huf_free_tree(root);

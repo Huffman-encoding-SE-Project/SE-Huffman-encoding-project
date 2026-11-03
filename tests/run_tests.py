@@ -51,6 +51,7 @@ def make_inputs(directory):
         "single_symbol_odd_length.bin": bytes([0xFE]) * 9,
 
         "two_symbols.bin": b"ab" * 5000,
+        "skewed_binary.bin": bytes([0x00]) * 20000 + bytes([0xFF]) * 100,
         "short_text.txt": b"hello huffman world",
         "english.txt": b"the quick brown fox jumps over the lazy dog. " * 500,
         "all_bytes.bin": bytes(range(256)) * 40,

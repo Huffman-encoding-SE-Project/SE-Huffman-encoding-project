@@ -82,7 +82,7 @@ def test_one_file(path, results, c_test_exes):
     results.append((
         f"input readable: {os.path.basename(path)}",
         True,
-        f"{len(data):,} bytes"
+        f"{len(data):,} bytes",
     ))
 
     for label, exe in c_test_exes.items():
@@ -90,7 +90,7 @@ def test_one_file(path, results, c_test_exes):
         results.append((
             f"C {label} test on {os.path.basename(path)}",
             r.returncode == 0,
-            (r.stdout + r.stderr).strip() or f"exit code {r.returncode}"
+            (r.stdout + r.stderr).strip() or f"exit code {r.returncode}",
         ))
 
     compressed = path + ".huf-test"
@@ -101,14 +101,14 @@ def test_one_file(path, results, c_test_exes):
         results.append((
             f"compress {os.path.basename(path)}",
             False,
-            c.stderr.strip()
+            c.stderr.strip(),
         ))
         return
 
     results.append((
         f"compress {os.path.basename(path)}",
         True,
-        c.stdout.strip()
+        c.stdout.strip(),
     ))
 
     d = run(EXE, "decompress", compressed, restored)
@@ -120,7 +120,7 @@ def test_one_file(path, results, c_test_exes):
     results.append((
         f"decompress and byte-compare {os.path.basename(path)}",
         ok,
-        d.stdout.strip() if d.returncode == 0 else d.stderr.strip()
+        d.stdout.strip() if d.returncode == 0 else d.stderr.strip(),
     ))
 
     for p in (compressed, restored):
@@ -146,7 +146,7 @@ def test_invalid_compressed_files(results):
             results.append((
                 "prepare invalid-file tests",
                 False,
-                c.stderr.strip()
+                c.stderr.strip(),
             ))
             return
 
@@ -178,8 +178,33 @@ def test_invalid_compressed_files(results):
             results.append((
                 f"reject {name}",
                 rejected,
-                d.stderr.strip() if rejected else "Invalid file was accepted"
+                d.stderr.strip() if rejected else "Invalid file was accepted",
             ))
+
+
+def test_cli_errors(results):
+    """Check expected behavior for missing input and missing arguments."""
+
+    with tempfile.TemporaryDirectory(prefix="huffman-cli-") as directory:
+        # TC10: Compression with a nonexistent input file must fail.
+        missing = os.path.join(directory, "does-not-exist.bin")
+        output = os.path.join(directory, "should-not-exist.huf")
+
+        result = run(EXE, "compress", missing, output)
+        results.append((
+            "reject nonexistent input file (TC10)",
+            result.returncode != 0,
+            f"exit code {result.returncode}",
+        ))
+
+    # TC13: Running without arguments must show usage and exit with code 2.
+    result = run(EXE)
+    has_usage = "usage" in (result.stdout + result.stderr).lower()
+    results.append((
+        "show usage without arguments (TC13)",
+        result.returncode == 2 and has_usage,
+        f"exit code {result.returncode}; usage shown={has_usage}",
+    ))
 
 
 def main():
@@ -195,7 +220,7 @@ def main():
             for label, source in C_TESTS.items():
                 output = os.path.join(
                     build_dir,
-                    "test_" + label + (".exe" if os.name == "nt" else "")
+                    "test_" + label + (".exe" if os.name == "nt" else ""),
                 )
                 build(
                     cc,
@@ -220,8 +245,9 @@ def main():
                     for path in make_inputs(inputs_dir):
                         test_one_file(path, results, c_test_exes)
 
-                # Run corrupted-file tests once, after the normal test cases.
+                # Run malformed-file and CLI tests once after normal test cases.
                 test_invalid_compressed_files(results)
+                test_cli_errors(results)
 
             failed = sum(not ok for _, ok, _ in results)
             lines = [

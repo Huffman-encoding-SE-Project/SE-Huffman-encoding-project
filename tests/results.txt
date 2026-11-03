@@ -636,5 +636,7 @@ Frequency count passed: 30000 bytes
 [PASS] reject truncated payload -- error: compressed data is truncated
 [PASS] reject extra trailing byte -- error: not a valid compressed file
 [PASS] reject corrupted magic -- error: not a valid compressed file
+[PASS] reject nonexistent input file (TC10) -- exit code 1
+[PASS] show usage without arguments (TC13) -- exit code 2; usage shown=True
 
-76/76 checks passed
+78/78 checks passed

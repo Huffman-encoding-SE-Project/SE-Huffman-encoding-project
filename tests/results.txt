@@ -18,6 +18,27 @@ Frequency count passed: 10000 bytes
 [PASS] C codes test on single_symbol_repeated.bin -- Code test passed: valid codes for all symbols in 10000 bytes
 [PASS] compress single_symbol_repeated.bin -- 10000 -> 2286 bytes (22.9% of original)
 [PASS] decompress and byte-compare single_symbol_repeated.bin -- 2286 -> 10000 bytes
+[PASS] input readable: single_null_symbol.bin -- 257 bytes
+[PASS] C frequency test on single_null_symbol.bin -- byte 0x00 (.): 257
+Frequency count passed: 257 bytes
+[PASS] C tree test on single_null_symbol.bin -- Tree test passed: root frequency = 257
+[PASS] C codes test on single_null_symbol.bin -- Code test passed: valid codes for all symbols in 257 bytes
+[PASS] compress single_null_symbol.bin -- 257 -> 1069 bytes (416.0% of original)
+[PASS] decompress and byte-compare single_null_symbol.bin -- 1069 -> 257 bytes
+[PASS] input readable: single_high_byte_symbol.bin -- 257 bytes
+[PASS] C frequency test on single_high_byte_symbol.bin -- byte 0xFF (.): 257
+Frequency count passed: 257 bytes
+[PASS] C tree test on single_high_byte_symbol.bin -- Tree test passed: root frequency = 257
+[PASS] C codes test on single_high_byte_symbol.bin -- Code test passed: valid codes for all symbols in 257 bytes
+[PASS] compress single_high_byte_symbol.bin -- 257 -> 1069 bytes (416.0% of original)
+[PASS] decompress and byte-compare single_high_byte_symbol.bin -- 1069 -> 257 bytes
+[PASS] input readable: single_symbol_odd_length.bin -- 9 bytes
+[PASS] C frequency test on single_symbol_odd_length.bin -- byte 0xFE (.): 9
+Frequency count passed: 9 bytes
+[PASS] C tree test on single_symbol_odd_length.bin -- Tree test passed: root frequency = 9
+[PASS] C codes test on single_symbol_odd_length.bin -- Code test passed: valid codes for all symbols in 9 bytes
+[PASS] compress single_symbol_odd_length.bin -- 9 -> 1038 bytes (11533.3% of original)
+[PASS] decompress and byte-compare single_symbol_odd_length.bin -- 1038 -> 9 bytes
 [PASS] input readable: two_symbols.bin -- 10,000 bytes
 [PASS] C frequency test on two_symbols.bin -- byte 0x61 (a): 5000
 byte 0x62 (b): 5000
@@ -26,6 +47,14 @@ Frequency count passed: 10000 bytes
 [PASS] C codes test on two_symbols.bin -- Code test passed: valid codes for all symbols in 10000 bytes
 [PASS] compress two_symbols.bin -- 10000 -> 2286 bytes (22.9% of original)
 [PASS] decompress and byte-compare two_symbols.bin -- 2286 -> 10000 bytes
+[PASS] input readable: skewed_binary.bin -- 20,100 bytes
+[PASS] C frequency test on skewed_binary.bin -- byte 0x00 (.): 20000
+byte 0xFF (.): 100
+Frequency count passed: 20100 bytes
+[PASS] C tree test on skewed_binary.bin -- Tree test passed: root frequency = 20100
+[PASS] C codes test on skewed_binary.bin -- Code test passed: valid codes for all symbols in 20100 bytes
+[PASS] compress skewed_binary.bin -- 20100 -> 3549 bytes (17.7% of original)
+[PASS] decompress and byte-compare skewed_binary.bin -- 3549 -> 20100 bytes
 [PASS] input readable: short_text.txt -- 19 bytes
 [PASS] C frequency test on short_text.txt -- byte 0x20 ( ): 2
 byte 0x61 (a): 1
@@ -603,5 +632,11 @@ Frequency count passed: 30000 bytes
 [PASS] C codes test on random.bin -- Code test passed: valid codes for all symbols in 30000 bytes
 [PASS] compress random.bin -- 30000 -> 31036 bytes (103.5% of original)
 [PASS] decompress and byte-compare random.bin -- 31036 -> 30000 bytes
+[PASS] reject truncated header -- error: not a valid compressed file
+[PASS] reject truncated payload -- error: compressed data is truncated
+[PASS] reject extra trailing byte -- error: not a valid compressed file
+[PASS] reject corrupted magic -- error: not a valid compressed file
+[PASS] reject nonexistent input file (TC10) -- exit code 1
+[PASS] show usage without arguments (TC13) -- exit code 2; usage shown=True
 
-48/48 checks passed
+78/78 checks passed

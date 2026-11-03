@@ -9,7 +9,7 @@ To verify that the Huffman compression tool compresses files and decompresses th
 - Programming language: C
 - Compiler: GCC
 - Test runner: Python 3
-- Operating system: Windows
+- Operating system: Windows and WSL Ubuntu
 - Project: Team 9 — Huffman Encoding Project
 
 ## 3. Test Cases
@@ -30,12 +30,11 @@ To verify that the Huffman compression tool compresses files and decompresses th
 | TC12 | Attempt decompression of a truncated compressed file | The program returns a nonzero exit code |
 | TC13 | Run the program without arguments | The program returns exit code 2 and prints usage information |
 
-These tests are automated by `tests/run_tests.py`. Their actual pass/fail status will be recorded after the test script runs successfully.
-
+These tests are automated by `tests/run_tests.py`.
 
 ## 4. Test Execution Status
 
-The following component tests and automated program tests were executed successfully in WSL Ubuntu.
+The component tests and automated program tests were executed successfully. The automated test suite was run using `python3 tests/run_tests.py`.
 
 | Test ID | Actual Result | Status |
 |---|---|---|
@@ -48,13 +47,15 @@ The following component tests and automated program tests were executed successf
 | TC04 | Two-symbol file compression and decompression verified | PASS |
 | TC05 | Short text file compression and decompression verified | PASS |
 | TC06 | Larger English text file compression and decompression verified | PASS |
-| TC07 | Skewed-frequency binary data test not yet executed | Pending |
+| TC07 | Skewed-frequency binary data compressed and decompressed successfully; output matched the original | PASS |
 | TC08 | File containing all byte values compressed and decompressed successfully | PASS |
-| TC09 | Random binary file compressed and decompressed successfully | PASS |
-| TC10–TC13 | Invalid input, invalid compressed file, truncated file, and missing-argument tests not yet executed | Pending |
+| TC09 | Random binary file compressed and decompressed successfully; output matched the original | PASS |
+| TC10 | Nonexistent input file was rejected with a nonzero exit code | PASS |
+| TC11 | Invalid compressed file was rejected | PASS |
+| TC12 | Truncated compressed file was rejected | PASS |
+| TC13 | Program returned exit code 2 and displayed usage information when run without arguments | PASS |
 
-**Automated Test Summary:** 48/48 checks passed across the eight tested input categories. Decompressed files were verified against their original files using byte-by-byte comparison.
-
+**Automated Test Summary:** 78/78 checks passed. Decompressed files were verified against their original files using byte-by-byte comparison.
 
 ## 5. Acceptance Criteria
 
@@ -64,12 +65,11 @@ The following component tests and automated program tests were executed successf
 - Invalid, corrupted, and truncated inputs are handled safely.
 - Memory and file resources are managed correctly.
 - The program displays appropriate usage information when run without arguments.
+
 ## 6. Notes
 
-The source files compiled successfully using GCC, and the executable was generated. 
-
-- The Windows native test execution was blocked by the system's Code Integrity policy.
+- The source files compiled successfully using GCC, and the executable was generated.
+- Windows native test execution was blocked by the system's Code Integrity policy.
 - The project was compiled successfully using GCC in WSL Ubuntu.
-- The automated test suite was executed using python3 tests/run_tests.py.
-- All 48 checks passed.
-- TC07 and TC10–TC13 remain pending.
+- The automated test suite was executed using `python3 tests/run_tests.py`.
+- All 78 checks passed.

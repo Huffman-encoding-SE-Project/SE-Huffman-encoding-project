@@ -26,6 +26,7 @@ C_TESTS = {
     "frequency": os.path.join(TESTS, "test_frequency.c"),
     "tree": os.path.join(TESTS, "test_tree.c"),
     "codes": os.path.join(TESTS, "test_codes.c"),
+    "format": os.path.join(TESTS, "test_format.c"),
 }
 
 

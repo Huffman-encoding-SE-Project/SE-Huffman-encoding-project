@@ -96,7 +96,17 @@ int main(int argc, char **argv)
         fprintf(stderr, "error: input and output paths cannot be the same\n");
         return 1;
     }
-    
+
+    if (compress && !has_extension(argv[3], ".huf")) {
+    fprintf(stderr, "error: compressed output must use .huf extension\n");
+    return 1;
+    }
+
+    if (!compress && !has_extension(argv[2], ".huf")) {
+    fprintf(stderr, "error: decompression input must use .huf extension\n");
+    return 1;
+    }
+
     if (!confirm_overwrite(argv[3])) {
         printf("Operation cancelled.\n");
         return 0;

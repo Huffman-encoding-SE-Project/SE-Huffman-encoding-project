@@ -1,1 +1,28 @@
+name: Huffman Encoding CI/CD
 
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Generate dummy test file
+        working-directory: tests
+        run: python test_sampler.py
+
+      - name: Execute Huffman compression tests
+        working-directory: tests
+        run: python run_tests.py ABC_25MB.txt

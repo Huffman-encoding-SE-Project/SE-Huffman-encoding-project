@@ -96,7 +96,11 @@ int main(int argc, char **argv)
         fprintf(stderr, "error: input and output paths cannot be the same\n");
         return 1;
     }
-
+    
+    if (!confirm_overwrite(argv[3])) {
+        printf("Operation cancelled.\n");
+        return 0;
+    }
     uint8_t *in = NULL, *out = NULL;
     size_t in_n = 0, out_n = 0;
 

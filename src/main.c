@@ -16,6 +16,73 @@ static void usage(const char *prog)
             prog, prog);
 }
 
+
+static int has_extension(const char *path, const char *extension)
+{
+    const char *dot = strrchr(path, '.');
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+
+    if (slash == NULL || (backslash != NULL && backslash > slash))
+        slash = backslash;
+
+    if (dot == NULL || (slash != NULL && dot < slash))
+        return 0;
+
+    while (*dot && *extension) {
+        if (tolower((unsigned char)*dot) !=
+            tolower((unsigned char)*extension))
+            return 0;
+
+        dot++;
+        extension++;
+    }
+
+    return *dot == '\0' && *extension == '\0';
+}
+
+static int same_path(const char *path1, const char *path2)
+{
+    while (*path1 && *path2) {
+        if (tolower((unsigned char)*path1) !=
+            tolower((unsigned char)*path2))
+            return 0;
+
+        path1++;
+        path2++;
+    }
+
+    return *path1 == '\0' && *path2 == '\0';
+}
+
+static int confirm_overwrite(const char *path)
+{
+    FILE *file = fopen(path, "rb");
+
+    if (file == NULL)
+        return 1;
+
+    fclose(file);
+
+    char choice;
+
+    while (1) {
+        printf("Output file already exists: %s\n", path);
+        printf("Do you want to overwrite it? (y/n): ");
+
+        if (scanf(" %c", &choice) != 1)
+            return 0;
+
+        if (choice == 'y' || choice == 'Y')
+            return 1;
+
+        if (choice == 'n' || choice == 'N')
+            return 0;
+
+        printf("Invalid choice. Enter y or n.\n");
+    }
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 4) { usage(argv[0]); return 2; }
@@ -25,6 +92,25 @@ int main(int argc, char **argv)
     else if (strcmp(argv[1], "decompress") == 0) compress = 0;
     else { usage(argv[0]); return 2; }
 
+    if (same_path(argv[2], argv[3])) {
+        fprintf(stderr, "error: input and output paths cannot be the same\n");
+        return 1;
+    }
+
+    if (compress && !has_extension(argv[3], ".huf")) {
+    fprintf(stderr, "error: compressed output must use .huf extension\n");
+    return 1;
+    }
+
+    if (!compress && !has_extension(argv[2], ".huf")) {
+    fprintf(stderr, "error: decompression input must use .huf extension\n");
+    return 1;
+    }
+
+    if (!confirm_overwrite(argv[3])) {
+        printf("Operation cancelled.\n");
+        return 0;
+    }
     uint8_t *in = NULL, *out = NULL;
     size_t in_n = 0, out_n = 0;
 

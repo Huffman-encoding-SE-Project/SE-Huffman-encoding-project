@@ -94,7 +94,7 @@ def test_one_file(path, results, c_test_exes):
             (r.stdout + r.stderr).strip() or f"exit code {r.returncode}",
         ))
 
-    compressed = path + ".huf-test"
+    compressed = path + ".test.huf"
     restored = path + ".restored-test"
 
     c = run(EXE, "compress", path, compressed)

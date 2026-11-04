@@ -9,27 +9,37 @@
 #include "src/huffman.h"
 #include "src/file_io.h"
 
-#define ID_INPUT      101
-#define ID_OUTPUT     102
-#define ID_BROWSE_IN  103
-#define ID_BROWSE_OUT 104
-#define ID_COMPRESS   105
-#define ID_DECOMPRESS 106
-#define ID_STATUS     107
+#define ID_INPUT       101
+#define ID_OUTPUT      102
+#define ID_BROWSE_IN   103
+#define ID_BROWSE_OUT  104
+#define ID_COMPRESS    105
+#define ID_DECOMPRESS  106
+#define ID_STATUS      107
 
-#define BG_COLOR      RGB(18, 25, 40)
-#define FIELD_COLOR   RGB(39, 51, 73)
+#define ID_TITLE       201
+#define ID_SUBTITLE    202
+#define ID_INPUT_LABEL 203
+#define ID_OUTPUT_LABEL 204
+#define ID_STATUS_LABEL 205
+
+#define BG_COLOR      RGB(15, 23, 42)
+#define PANEL_COLOR   RGB(22, 32, 52)
+#define FIELD_COLOR   RGB(31, 43, 65)
 #define TEXT_COLOR    RGB(235, 241, 250)
-#define MUTED_COLOR   RGB(160, 175, 198)
-#define BLUE_COLOR    RGB(50, 125, 235)
-#define GREEN_COLOR   RGB(55, 180, 125)
-#define RED_COLOR     RGB(225, 85, 95)
+#define MUTED_COLOR   RGB(153, 170, 195)
+#define BLUE_COLOR    RGB(55, 125, 245)
+#define BLUE_HOVER    RGB(75, 145, 255)
+#define BUTTON_COLOR  RGB(43, 58, 82)
+#define GREEN_COLOR   RGB(60, 190, 135)
+#define RED_COLOR     RGB(240, 95, 105)
 
 static HWND inputBox, outputBox, statusBox;
 static HINSTANCE appInstance;
 static HFONT titleFont, normalFont, buttonFont;
-static HBRUSH bgBrush, fieldBrush;
+static HBRUSH bgBrush, panelBrush, fieldBrush;
 static COLORREF statusColor = MUTED_COLOR;
+static BOOL customOutput = FALSE;
 
 static void set_status(const char *text, COLORREF color)
 {
@@ -38,7 +48,54 @@ static void set_status(const char *text, COLORREF color)
     InvalidateRect(statusBox, NULL, TRUE);
 }
 
-static void choose_file(HWND owner, BOOL save, HWND target)
+static int has_extension(const char *path, const char *extension)
+{
+    const char *dot = strrchr(path, '.');
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+
+    if (slash == NULL || (backslash != NULL && backslash > slash))
+        slash = backslash;
+
+    return dot != NULL && (slash == NULL || dot > slash)
+        && _stricmp(dot, extension) == 0;
+}
+
+static void make_default_output(const char *input, BOOL compress,
+                               char *output, size_t outputSize)
+{
+    const char *slash = strrchr(input, '\\');
+    const char *forwardSlash = strrchr(input, '/');
+
+    if (forwardSlash && (!slash || forwardSlash > slash))
+        slash = forwardSlash;
+
+    const char *filename = slash ? slash + 1 : input;
+    size_t folderLength = slash ? (size_t)(slash - input + 1) : 0;
+
+    char folder[MAX_PATH];
+    char base[MAX_PATH];
+
+    if (folderLength >= sizeof(folder))
+        folderLength = sizeof(folder) - 1;
+
+    memcpy(folder, input, folderLength);
+    folder[folderLength] = '\0';
+
+    strncpy(base, filename, sizeof(base) - 1);
+    base[sizeof(base) - 1] = '\0';
+
+    char *dot = strrchr(base, '.');
+    if (dot)
+        *dot = '\0';
+
+    snprintf(output, outputSize, "%s%s_%s.%s",
+             folder, base,
+             compress ? "compressed" : "decompressed",
+             compress ? "huf" : "bin");
+}
+
+static void choose_file(HWND owner, BOOL save)
 {
     char path[MAX_PATH] = "";
     OPENFILENAMEA ofn;
@@ -52,21 +109,51 @@ static void choose_file(HWND owner, BOOL save, HWND target)
     ofn.Flags = OFN_PATHMUSTEXIST |
                 (save ? OFN_OVERWRITEPROMPT : OFN_FILEMUSTEXIST);
 
+    if (save)
+        ofn.lpstrDefExt = "huf";
+
     BOOL ok = save ? GetSaveFileNameA(&ofn) : GetOpenFileNameA(&ofn);
-    if (ok)
-        SetWindowTextA(target, path);
+    if (!ok)
+        return;
+
+    SetWindowTextA(save ? outputBox : inputBox, path);
+
+    if (save) {
+        customOutput = TRUE;
+        set_status("Custom output location selected.", MUTED_COLOR);
+    } else {
+        char generated[MAX_PATH];
+        customOutput = FALSE;
+        make_default_output(path, TRUE, generated, sizeof(generated));
+        SetWindowTextA(outputBox, generated);
+        set_status("Input selected. Output path generated automatically.",
+                   MUTED_COLOR);
+    }
 }
 
 static void run_operation(HWND owner, BOOL compress)
 {
-    char input[MAX_PATH], output[MAX_PATH];
-    GetWindowTextA(inputBox, input, MAX_PATH);
-    GetWindowTextA(outputBox, output, MAX_PATH);
+    char input[MAX_PATH] = "";
+    char output[MAX_PATH] = "";
 
-    if (!input[0] || !output[0]) {
-        set_status("Select an input file and an output location.", RED_COLOR);
-        MessageBoxA(owner, "Choose both an input and output file.",
-                    "Missing file", MB_OK | MB_ICONWARNING);
+    GetWindowTextA(inputBox, input, sizeof(input));
+
+    if (!input[0]) {
+        set_status("Select an input file first.", RED_COLOR);
+        MessageBoxA(owner, "Choose an input file.",
+                    "Missing input", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    if (customOutput) {
+        GetWindowTextA(outputBox, output, sizeof(output));
+    } else {
+        make_default_output(input, compress, output, sizeof(output));
+        SetWindowTextA(outputBox, output);
+    }
+
+    if (!output[0]) {
+        set_status("Could not generate an output path.", RED_COLOR);
         return;
     }
 
@@ -77,12 +164,26 @@ static void run_operation(HWND owner, BOOL compress)
         return;
     }
 
+    if (compress && !has_extension(output, ".huf")) {
+        set_status("Compression output must use .huf.", RED_COLOR);
+        MessageBoxA(owner, "Compressed output must use the .huf extension.",
+                    "Invalid output extension", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    if (!compress && !has_extension(input, ".huf")) {
+        set_status("Decompression input must use .huf.", RED_COLOR);
+        MessageBoxA(owner, "Decompression input must use the .huf extension.",
+                    "Invalid input extension", MB_OK | MB_ICONWARNING);
+        return;
+    }
+
     DWORD attributes = GetFileAttributesA(output);
     if (attributes != INVALID_FILE_ATTRIBUTES) {
-        if (MessageBoxA(owner, "Output file already exists. Replace it?",
+        if (MessageBoxA(owner, "The output file already exists. Replace it?",
                         "Confirm overwrite",
                         MB_YESNO | MB_ICONWARNING) != IDYES) {
-            set_status("Cancelled; existing file was not changed.", MUTED_COLOR);
+            set_status("Cancelled. Existing file was not changed.", MUTED_COLOR);
             return;
         }
     }
@@ -90,8 +191,7 @@ static void run_operation(HWND owner, BOOL compress)
     uint8_t *in = NULL, *out = NULL;
     size_t inSize = 0, outSize = 0;
 
-    set_status("Working...", BLUE_COLOR);
-    UpdateWindow(statusBox);
+    set_status("Processing file...", BLUE_COLOR);
 
     if (read_file(input, &in, &inSize) != 0) {
         set_status("Could not read the input file.", RED_COLOR);
@@ -107,11 +207,11 @@ static void run_operation(HWND owner, BOOL compress)
     free(in);
 
     if (result != HUF_OK) {
-        char message[256];
-        snprintf(message, sizeof(message), "Huffman operation failed: %s",
+        char error[256];
+        snprintf(error, sizeof(error), "Operation failed: %s",
                  huf_strerror(result));
-        set_status(message, RED_COLOR);
-        MessageBoxA(owner, message, "Operation failed",
+        set_status(error, RED_COLOR);
+        MessageBoxA(owner, error, "Operation failed",
                     MB_OK | MB_ICONERROR);
         free(out);
         return;
@@ -127,21 +227,21 @@ static void run_operation(HWND owner, BOOL compress)
 
     free(out);
 
-    char message[300];
+    char success[300];
     if (compress && inSize > 0) {
-        double ratio = 100.0 * (double)outSize / (double)inSize;
-        snprintf(message, sizeof(message),
-                 "Compression complete | Original: %llu bytes | Compressed: %llu bytes | %.1f%% of original",
+        snprintf(success, sizeof(success),
+                 "Compression complete  |  %llu bytes -> %llu bytes  |  %.1f%%",
                  (unsigned long long)inSize,
-                 (unsigned long long)outSize, ratio);
+                 (unsigned long long)outSize,
+                 100.0 * (double)outSize / (double)inSize);
     } else {
-        snprintf(message, sizeof(message),
-                 "Decompression complete | Input: %llu bytes | Output: %llu bytes",
+        snprintf(success, sizeof(success),
+                 "Decompression complete  |  %llu bytes -> %llu bytes",
                  (unsigned long long)inSize,
                  (unsigned long long)outSize);
     }
 
-    set_status(message, GREEN_COLOR);
+    set_status(success, GREEN_COLOR);
 }
 
 static HWND add_control(HWND parent, const char *klass, const char *text,
@@ -160,86 +260,128 @@ static HWND add_control(HWND parent, const char *klass, const char *text,
 
 static void draw_button(const DRAWITEMSTRUCT *item)
 {
-    HDC dc = item->hDC;
-    RECT rect = item->rcItem;
+    RECT r = item->rcItem;
     COLORREF color = item->CtlID == ID_COMPRESS
-        ? BLUE_COLOR : RGB(48, 62, 85);
+        ? BLUE_COLOR : BUTTON_COLOR;
 
     if (item->itemState & ODS_SELECTED)
         color = RGB(35, 95, 190);
 
     HBRUSH brush = CreateSolidBrush(color);
-    FillRect(dc, &rect, brush);
+    FillRect(item->hDC, &r, brush);
     DeleteObject(brush);
 
-    SetBkMode(dc, TRANSPARENT);
-    SetTextColor(dc, TEXT_COLOR);
-    SelectObject(dc, buttonFont);
+    SetBkMode(item->hDC, TRANSPARENT);
+    SetTextColor(item->hDC, TEXT_COLOR);
+    SelectObject(item->hDC, buttonFont);
 
     char text[64];
     GetWindowTextA(item->hwndItem, text, sizeof(text));
-    DrawTextA(dc, text, -1, &rect,
+    DrawTextA(item->hDC, text, -1, &r,
               DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+}
+
+static void layout_controls(HWND hwnd)
+{
+    RECT client;
+    GetClientRect(hwnd, &client);
+
+    int width = client.right - client.left;
+    int height = client.bottom - client.top;
+
+    int contentWidth = 620;
+    int x = (width - contentWidth) / 2;
+    if (x < 24) x = 24;
+
+    int y = (height - 430) / 2;
+    if (y < 30) y = 30;
+
+    MoveWindow(GetDlgItem(hwnd, ID_TITLE), x, y, 300, 38, TRUE);
+    MoveWindow(GetDlgItem(hwnd, ID_SUBTITLE), x + 2, y + 40, 320, 24, TRUE);
+
+    MoveWindow(GetDlgItem(hwnd, ID_INPUT_LABEL), x, y + 88, 140, 22, TRUE);
+    MoveWindow(inputBox, x, y + 112, 480, 36, TRUE);
+    MoveWindow(GetDlgItem(hwnd, ID_BROWSE_IN), x + 495, y + 112, 110, 36, TRUE);
+
+    MoveWindow(GetDlgItem(hwnd, ID_OUTPUT_LABEL), x, y + 172, 140, 22, TRUE);
+    MoveWindow(outputBox, x, y + 196, 480, 36, TRUE);
+    MoveWindow(GetDlgItem(hwnd, ID_BROWSE_OUT), x + 495, y + 196, 110, 36, TRUE);
+
+    MoveWindow(GetDlgItem(hwnd, ID_COMPRESS), x, y + 260, 195, 48, TRUE);
+    MoveWindow(GetDlgItem(hwnd, ID_DECOMPRESS), x + 210, y + 260, 195, 48, TRUE);
+
+    MoveWindow(GetDlgItem(hwnd, ID_STATUS_LABEL), x, y + 332, 140, 22, TRUE);
+    MoveWindow(statusBox, x, y + 358, contentWidth, 56, TRUE);
 }
 
 static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
     case WM_CREATE:
-        titleFont = CreateFontA(
-            25, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+        titleFont = CreateFontA(29, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH, "Segoe UI");
 
-        normalFont = CreateFontA(
-            15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        normalFont = CreateFontA(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH, "Segoe UI");
 
-        buttonFont = CreateFontA(
-            16, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+        buttonFont = CreateFontA(16, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             CLEARTYPE_QUALITY, DEFAULT_PITCH, "Segoe UI");
 
-        bgBrush = CreateSolidBrush(BG_COLOR);
+        panelBrush = CreateSolidBrush(PANEL_COLOR);
         fieldBrush = CreateSolidBrush(FIELD_COLOR);
 
-        add_control(hwnd, "STATIC", "HUFFMAN", 0, 26, 18, 250, 34, 0);
-        add_control(hwnd, "STATIC", "FILE COMPRESSION TOOL", 0,
-                    28, 52, 300, 22, 0);
+        HWND title = add_control(hwnd, "STATIC", "HUFFMAN",
+            SS_LEFT, 0, 0, 300, 38, ID_TITLE);
+        SendMessageA(title, WM_SETFONT, (WPARAM)titleFont, TRUE);
 
-        add_control(hwnd, "STATIC", "INPUT FILE", 0,
-                    28, 95, 120, 20, 0);
+        add_control(hwnd, "STATIC", "FILE COMPRESSION TOOL",
+            SS_LEFT, 0, 0, 320, 24, ID_SUBTITLE);
+
+        add_control(hwnd, "STATIC", "INPUT FILE",
+            SS_LEFT, 0, 0, 140, 22, ID_INPUT_LABEL);
         inputBox = add_control(hwnd, "EDIT", "",
-                    WS_BORDER | ES_AUTOHSCROLL,
-                    28, 118, 465, 30, ID_INPUT);
-        add_control(hwnd, "BUTTON", "Browse", BS_PUSHBUTTON,
-                    505, 118, 95, 30, ID_BROWSE_IN);
+            WS_BORDER | ES_AUTOHSCROLL, 0, 0, 480, 36, ID_INPUT);
+        add_control(hwnd, "BUTTON", "Browse",
+            BS_PUSHBUTTON, 0, 0, 110, 36, ID_BROWSE_IN);
 
-        add_control(hwnd, "STATIC", "OUTPUT FILE", 0,
-                    28, 169, 120, 20, 0);
+        add_control(hwnd, "STATIC", "OUTPUT FILE",
+            SS_LEFT, 0, 0, 140, 22, ID_OUTPUT_LABEL);
         outputBox = add_control(hwnd, "EDIT", "",
-                    WS_BORDER | ES_AUTOHSCROLL,
-                    28, 192, 465, 30, ID_OUTPUT);
-        add_control(hwnd, "BUTTON", "Save as", BS_PUSHBUTTON,
-                    505, 192, 95, 30, ID_BROWSE_OUT);
+            WS_BORDER | ES_AUTOHSCROLL, 0, 0, 480, 36, ID_OUTPUT);
+        add_control(hwnd, "BUTTON", "Save as",
+            BS_PUSHBUTTON, 0, 0, 110, 36, ID_BROWSE_OUT);
 
-        add_control(hwnd, "BUTTON", "Compress", BS_OWNERDRAW,
-                    28, 246, 180, 42, ID_COMPRESS);
-        add_control(hwnd, "BUTTON", "Decompress", BS_OWNERDRAW,
-                    220, 246, 180, 42, ID_DECOMPRESS);
+        add_control(hwnd, "BUTTON", "Compress",
+            BS_OWNERDRAW, 0, 0, 195, 48, ID_COMPRESS);
+        add_control(hwnd, "BUTTON", "Decompress",
+            BS_OWNERDRAW, 0, 0, 195, 48, ID_DECOMPRESS);
 
-        add_control(hwnd, "STATIC", "STATUS", 0,
-                    28, 315, 120, 20, 0);
+        add_control(hwnd, "STATIC", "STATUS",
+            SS_LEFT, 0, 0, 140, 22, ID_STATUS_LABEL);
         statusBox = add_control(hwnd, "STATIC",
-                    "Choose an input file to get started.",
-                    SS_LEFT, 28, 338, 570, 55, ID_STATUS);
+            "Choose an input file to get started.",
+            SS_LEFT, 0, 0, 620, 56, ID_STATUS);
+
+        layout_controls(hwnd);
         return 0;
+
+    case WM_SIZE:
+        layout_controls(hwnd);
+        return 0;
+
+    case WM_ERASEBKGND: {
+        RECT r;
+        GetClientRect(hwnd, &r);
+        FillRect((HDC)wp, &r, bgBrush);
+        return 1;
+    }
 
     case WM_CTLCOLORSTATIC: {
         HDC dc = (HDC)wp;
         HWND control = (HWND)lp;
-
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, control == statusBox ? statusColor : TEXT_COLOR);
         return (LRESULT)bgBrush;
@@ -259,10 +401,10 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_COMMAND:
         switch (LOWORD(wp)) {
         case ID_BROWSE_IN:
-            choose_file(hwnd, FALSE, inputBox);
+            choose_file(hwnd, FALSE);
             return 0;
         case ID_BROWSE_OUT:
-            choose_file(hwnd, TRUE, outputBox);
+            choose_file(hwnd, TRUE);
             return 0;
         case ID_COMPRESS:
             run_operation(hwnd, TRUE);
@@ -278,6 +420,7 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         DeleteObject(normalFont);
         DeleteObject(buttonFont);
         DeleteObject(bgBrush);
+        DeleteObject(panelBrush);
         DeleteObject(fieldBrush);
         PostQuitMessage(0);
         return 0;
@@ -286,11 +429,14 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     return DefWindowProcA(hwnd, msg, wp, lp);
 }
 
-int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR command, int show)
+int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous,
+                   LPSTR command, int show)
 {
     (void)previous;
     (void)command;
+
     appInstance = instance;
+    bgBrush = CreateSolidBrush(BG_COLOR);
 
     WNDCLASSA wc;
     ZeroMemory(&wc, sizeof(wc));
@@ -298,15 +444,24 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR command, int sh
     wc.hInstance = instance;
     wc.lpszClassName = "HuffmanGuiWindow";
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = CreateSolidBrush(BG_COLOR);
+    wc.hbrBackground = bgBrush;
 
     if (!RegisterClassA(&wc))
         return 1;
 
+    int windowWidth = 820;
+    int windowHeight = 620;
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
     HWND hwnd = CreateWindowA(
-        wc.lpszClassName, "Huffman Compression Tool",
-        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-        660, 450, NULL, NULL, instance, NULL);
+        wc.lpszClassName,
+        "Huffman Compression Tool",
+        WS_OVERLAPPEDWINDOW,
+        (screenWidth - windowWidth) / 2,
+        (screenHeight - windowHeight) / 2,
+        windowWidth, windowHeight,
+        NULL, NULL, instance, NULL);
 
     if (!hwnd)
         return 1;

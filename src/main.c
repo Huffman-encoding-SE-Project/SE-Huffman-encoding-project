@@ -63,6 +63,11 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "compress") == 0)        compress = 1;
     else if (strcmp(argv[1], "decompress") == 0) compress = 0;
     else { usage(argv[0]); return 2; }
+    
+    if (same_path(argv[2], argv[3])) {
+        fprintf(stderr, "error: input and output paths cannot be the same\n");
+        return 1;
+    }
 
     uint8_t *in = NULL, *out = NULL;
     size_t in_n = 0, out_n = 0;

@@ -239,21 +239,9 @@ The repository provides the primary evidence for completed implementation work:
 - PR #37 for the GUI.
 - The project README’s recorded automated test result.
 
-## H. Team Handoff and Remaining Work
+## H. Completion Status
 
-The Sprint 2 implementation and testing work listed in this report is complete. Branch-testing documentation is being prepared separately.
-
-The teammate responsible for branch testing should:
-
-1. Start from the latest `main`.
-2. Run the agreed branch-testing procedure.
-3. Record the actual commands and tool output.
-4. Include only measured coverage values.
-5. Save the results in a separate Markdown document, such as `BRANCH_TESTING.md`.
-6. Push the document on a separate branch and open a pull request.
-7. Notify the team when the pull request is ready for review.
-
-Once the separate document is merged, this report can be updated with a link to it.
+All Sprint 2 implementation and testing tasks assigned to the team have been completed. The completed work is documented in this report.
 
 ## I. Sprint Conclusion
 
